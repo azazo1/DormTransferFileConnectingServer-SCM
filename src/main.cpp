@@ -189,7 +189,8 @@ void ConnectingServer::handle_msg(int client_fd, char seq_code_bytes[SEQUENCE_CO
                     client_index = i;
                 }
             }
-            if (client_index > 0) {
+            if (client_index >= 0) {
+                Serial.printf("Client index: %d\n", client_index);
                 sender_connection_code[client_index] = code_generator.next();
                 sender_server_port[client_index] = port;
                 sender_filenames[client_index] = string(filename_data);
@@ -197,6 +198,8 @@ void ConnectingServer::handle_msg(int client_fd, char seq_code_bytes[SEQUENCE_CO
                 char connection_code_buffer[5];
                 sprintf(connection_code_buffer, "%04d", sender_connection_code[client_index]);
                 send_(client_fd, connection_code_buffer, 4, MSG_WAITALL);
+            } else {
+                Serial.println("Error: client index not found, this should not exist");
             }
             break;
         }
@@ -205,6 +208,7 @@ void ConnectingServer::handle_msg(int client_fd, char seq_code_bytes[SEQUENCE_CO
             char conn_code_buffer[5] = {0};
             read(client_fd, conn_code_buffer, 4);
             int conn_code = strtol(conn_code_buffer, nullptr, 10);
+            Serial.printf("Query connection code: %d\n", conn_code);
 
             char sender_not_found_response[3] = "00";
 
@@ -218,7 +222,8 @@ void ConnectingServer::handle_msg(int client_fd, char seq_code_bytes[SEQUENCE_CO
                     break;
                 }
             }
-            if (query_rst > 0) { // query succeed
+            Serial.printf("Query result: %d\n", query_rst);
+            if (query_rst >= 0) { // query succeed
                 char *ip = inet_ntoa(ip_address_net[query_rst]);
                 int ip_length = (int) strlen(ip);
                 char ip_length_data[3] = {0};
