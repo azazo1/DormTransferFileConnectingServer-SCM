@@ -14,7 +14,7 @@
 
 #define SEQUENCE_CODE_LENGTH 5
 #define TYPE_CODE_LENGTH 2
-#define MAX_FILENAME_LENGTH 999
+#define MAX_FILENAME_LENGTH 100
 #define SERVER_PORT 8088
 #define MAX_CONNECTION 10
 
@@ -48,7 +48,7 @@ private:
     /**
      * Sender server port, corresponding to client_fds. It's valid only when the client registered as a sender
      * */
-    std::vector<std::string> sender_filenames;
+    char sender_filenames[MAX_CONNECTION][MAX_FILENAME_LENGTH];
     ConnectionCodeGenerator code_generator;
     int server_sock_fd;
     /**

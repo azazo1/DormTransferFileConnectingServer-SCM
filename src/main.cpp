@@ -1,5 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
+#include <esp_wifi_default.h>
+#include <esp_wifi.h>
 #include "main.h"
 
 
@@ -52,7 +54,6 @@ ConnectingServer::ConnectingServer() : client_fds{0}, sender_connection_code{0},
         Serial.println("Server listen error");
         return;
     }
-    sender_filenames.reserve(MAX_CONNECTION);
     available = true;
 }
 
@@ -97,6 +98,7 @@ void ConnectingServer::handleLoop() {
                         if (stored_client_fd == 0) {
                             accepted_client_fd = stored_client_fd = client_sock_fd;
                             ip_address_net[i] = client_address.sin_addr.s_addr;
+                            Serial.printf("IP: %s\n", inet_ntoa(client_address.sin_addr.s_addr));
                             Serial.printf("New stored_client_fd:[%d] added successfully!\n", client_sock_fd);
                             break;
                         }
@@ -147,7 +149,7 @@ void ConnectingServer::handle_msg(int client_fd, char seq_code_bytes[SEQUENCE_CO
             Serial.println("Get fetch available senders msg");
             int n_sender = 0;
             int conn_codes[MAX_CONNECTION];
-            vector<string> filenames;
+            vector<char *> filenames;
             for (int i = 0; i < MAX_CONNECTION; i++) {
                 if (sender_connection_code[i] != 0) {
                     conn_codes[n_sender] = sender_connection_code[i];
@@ -161,7 +163,7 @@ void ConnectingServer::handle_msg(int client_fd, char seq_code_bytes[SEQUENCE_CO
             for (int i = 0; i < n_sender; i++) {
                 sprintf(temp_buffer, "%04d", conn_codes[i]);
                 send_(client_fd, temp_buffer, 4, MSG_WAITALL); // send conn_code
-                string filename = filenames[i];
+                string filename = string(filenames[i]);
                 char filename_buffer[MAX_FILENAME_LENGTH];
 
                 int filename_length = sprintf(filename_buffer, "%s", filename.c_str());
@@ -183,6 +185,8 @@ void ConnectingServer::handle_msg(int client_fd, char seq_code_bytes[SEQUENCE_CO
             char port_buffer[6] = {0};
             read(client_fd, port_buffer, 5); // read port
             ushort port = strtol(port_buffer, nullptr, 10);
+
+            Serial.printf("Registration info received, filename:\"%s\", port:%d\n", filename_data, port);
             int client_index = -1;
             for (int i = 0; i < MAX_CONNECTION; i++) { // search for client index
                 if (client_fds[i] == client_fd) {
@@ -193,8 +197,8 @@ void ConnectingServer::handle_msg(int client_fd, char seq_code_bytes[SEQUENCE_CO
                 Serial.printf("Client index: %d\n", client_index);
                 sender_connection_code[client_index] = code_generator.next();
                 sender_server_port[client_index] = port;
-                sender_filenames[client_index] = string(filename_data);
-
+                strcpy(sender_filenames[client_index], filename_data);
+                Serial.println("Sender info stored");
                 char connection_code_buffer[5];
                 sprintf(connection_code_buffer, "%04d", sender_connection_code[client_index]);
                 send_(client_fd, connection_code_buffer, 4, MSG_WAITALL);
@@ -222,9 +226,12 @@ void ConnectingServer::handle_msg(int client_fd, char seq_code_bytes[SEQUENCE_CO
                     break;
                 }
             }
-            Serial.printf("Query result: %d\n", query_rst);
+            Serial.printf("Queried sender index: %d\n", query_rst);
             if (query_rst >= 0) { // query succeed
-                char *ip = inet_ntoa(ip_address_net[query_rst]);
+                uint32_t ip_n_int = ip_address_net[query_rst];
+                Serial.printf("ip n int: %d\n", ip_n_int);
+                char *ip = inet_ntoa(ip_n_int);
+                Serial.printf("Queried sender ip: %s\n", ip);
                 int ip_length = (int) strlen(ip);
                 char ip_length_data[3] = {0};
                 sprintf(ip_length_data, "%02d", ip_length);
@@ -243,6 +250,17 @@ void ConnectingServer::handle_msg(int client_fd, char seq_code_bytes[SEQUENCE_CO
     }
 }
 
+void set_static_ip() {
+    int last_octet = 200;
+    if (!WiFi.config(IPAddress(192, 168, 1, last_octet), IPAddress(192, 168, 1, 1),
+                     IPAddress(255, 255, 255, 0),
+                     IPAddress(192, 168, 1, 1), IPAddress(114, 114, 114, 114))) {
+        Serial.println("Failed to set static ip");
+    } else {
+        Serial.printf("Set static ip: 192.168.1.%d\n", last_octet);
+    }
+}
+
 void setup() {
     Serial.begin(9600);
     WiFi.begin(WIFI_SSID, WIFI_PWD);
@@ -252,6 +270,7 @@ void setup() {
         delay(1000);
     }
     Serial.println("Connected");
+    set_static_ip();
 }
 
 void loop() {
