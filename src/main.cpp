@@ -89,7 +89,7 @@ void ConnectingServer::handleLoop() {
         } else {
             if (FD_ISSET(server_sock_fd, &server_fd_set)) {
                 struct sockaddr_in client_address{};
-                socklen_t address_len;
+                socklen_t address_len = sizeof(client_address);
                 int client_sock_fd = accept(server_sock_fd, (struct sockaddr *) &client_address, &address_len);
                 if (client_sock_fd > 0) {
                     int accepted_client_fd = -1;
@@ -228,8 +228,7 @@ void ConnectingServer::handle_msg(int client_fd, char seq_code_bytes[SEQUENCE_CO
             }
             Serial.printf("Queried sender index: %d\n", query_rst);
             if (query_rst >= 0) { // query succeed
-                uint32_t ip_n_int = ip_address_net[query_rst];
-                Serial.printf("ip n int: %d\n", ip_n_int);
+                auto ip_n_int = ip_address_net[query_rst];
                 char *ip = inet_ntoa(ip_n_int);
                 Serial.printf("Queried sender ip: %s\n", ip);
                 int ip_length = (int) strlen(ip);
